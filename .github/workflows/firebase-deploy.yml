@@ -19,6 +19,11 @@ jobs:
         
     - name: Install Firebase CLI
       run: npm install -g firebase-tools
+
+          - name: Install Dependencies
+      run: |
+        cd functions
+        npm install
       
     - name: Write Service Account Key
       run: |
