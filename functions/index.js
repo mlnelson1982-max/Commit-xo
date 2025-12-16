@@ -40,7 +40,20 @@ function todayId(timezone = 'America/Detroit') {
     throw new functions.https.HttpsError('internal', 'Failed to create formatter.');
   }
 
-  const parts = formatter.formatToParts(new Date());
+  let parts;
+  try {
+    parts = formatter.formatToParts(new Date());
+  } catch (err) {
+    if (err instanceof RangeError) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        `Invalid timezone provided: ${tz}`
+      );
+    }
+
+    throw new functions.https.HttpsError('internal', 'Failed to format date.');
+  }
+
   const yyyy = parts.find((p) => p.type === 'year')?.value;
   const mm = parts.find((p) => p.type === 'month')?.value;
   const dd = parts.find((p) => p.type === 'day')?.value;
