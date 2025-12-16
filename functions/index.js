@@ -1,21 +1,31 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
-const { GoogleGenAI } = require('@google/genai');
+const functions = require("firebase-functions");
+const admin = require("firebase-admin");
+const {GoogleGenAI} = require("@google/genai");
 
 admin.initializeApp();
 
+/**
+ * Validates authentication
+ * @param {Object} context - callable context
+ * @return {string} uid
+ */
 function requireAuth(context) {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Login required.');
+    throw new functions.https.HttpsError("unauthenticated", "Login required.");
   }
   return context.auth.uid;
 }
 
-function todayId(timezone = 'America/Detroit') {
-  if (typeof timezone !== 'string' || !timezone.trim()) {
+/**
+ * Returns today's date string
+ * @param {string} timezone - user timezone
+ * @return {string} YYYY-MM-DD
+ */
+function todayId(timezone = "America/Detroit") {
+  if (typeof timezone !== "string" || !timezone.trim()) {
     throw new functions.https.HttpsError(
-      'invalid-argument',
-      'Timezone must be a non-empty string.'
+        "invalid-argument",
+        "Timezone must be a non-empty string.",
     );
   }
 
@@ -23,21 +33,21 @@ function todayId(timezone = 'America/Detroit') {
 
   let formatter;
   try {
-    formatter = new Intl.DateTimeFormat('en-CA', {
+    formatter = new Intl.DateTimeFormat("en-CA", {
       timeZone: tz,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
     });
   } catch (err) {
     if (err instanceof RangeError) {
       throw new functions.https.HttpsError(
-        'invalid-argument',
-        `Invalid timezone provided: ${tz}`
+          "invalid-argument",
+          `Invalid timezone provided: ${tz}`,
       );
     }
 
-    throw new functions.https.HttpsError('internal', 'Failed to create formatter.');
+    throw new functions.https.HttpsError("internal", "Failed to create formatter.");
   }
 
   let parts;
@@ -46,20 +56,20 @@ function todayId(timezone = 'America/Detroit') {
   } catch (err) {
     if (err instanceof RangeError) {
       throw new functions.https.HttpsError(
-        'invalid-argument',
-        `Invalid timezone provided: ${tz}`
+          "invalid-argument",
+          `Invalid timezone provided: ${tz}`,
       );
     }
 
-    throw new functions.https.HttpsError('internal', 'Failed to format date.');
+    throw new functions.https.HttpsError("internal", "Failed to format date.");
   }
 
-  const yyyy = parts.find((p) => p.type === 'year')?.value;
-  const mm = parts.find((p) => p.type === 'month')?.value;
-  const dd = parts.find((p) => p.type === 'day')?.value;
+  const yyyy = parts.find((p) => p.type === "year")?.value;
+  const mm = parts.find((p) => p.type === "month")?.value;
+  const dd = parts.find((p) => p.type === "day")?.value;
 
   if (!yyyy || !mm || !dd) {
-    throw new functions.https.HttpsError('internal', 'Failed to format date.');
+    throw new functions.https.HttpsError("internal", "Failed to format date.");
   }
 
   return `${yyyy}-${mm}-${dd}`;
@@ -77,25 +87,25 @@ exports.generateDailyPlan = functions.https.onCall(async (data, context) => {
   const [userSnap, profileSnap] = await Promise.all([userRef.get(), profileRef.get()]);
 
   if (!userSnap.exists) {
-    throw new functions.https.HttpsError('failed-precondition', 'User doc missing.');
+    throw new functions.https.HttpsError("failed-precondition", "User doc missing.");
   }
   if (!profileSnap.exists) {
-    throw new functions.https.HttpsError('failed-precondition', 'Profile doc missing.');
+    throw new functions.https.HttpsError("failed-precondition", "Profile doc missing.");
   }
 
   const user = userSnap.data();
   const profile = profileSnap.data();
-  const tz = user.timezone || 'America/Detroit';
+  const tz = user.timezone || "America/Detroit";
   const date = data?.date || todayId(tz);
 
-  const ai = new GoogleGenAI({ apiKey: functions.config().gemini.key });
+  const ai = new GoogleGenAI({apiKey: functions.config().gemini.key});
 
-  const systemInstruction = `You are Commit+ Coach AI. Return ONLY valid JSON. No markdown. No commentary.`;
+  const systemInstruction = "You are Commit+ Coach AI. Return ONLY valid JSON. No markdown. No commentary.";
 
   const prompt = {
     user: {
       timezone: tz,
-      coachMode: user.coachMode || 'coach',
+      coachMode: user.coachMode || "coach",
     },
     profile: {
       goalLbsToLose: profile.goalLbsToLose,
@@ -112,60 +122,60 @@ exports.generateDailyPlan = functions.https.onCall(async (data, context) => {
   };
 
   const schema = {
-    type: 'object',
+    type: "object",
     properties: {
       today_plan: {
-        type: 'object',
+        type: "object",
         properties: {
-          fasting_window: { type: 'string' },
-          hydration_goal_oz: { type: 'integer' },
-          steps_target: { type: 'integer' },
+          fasting_window: {type: "string"},
+          hydration_goal_oz: {type: "integer"},
+          steps_target: {type: "integer"},
           workout: {
-            type: 'object',
+            type: "object",
             properties: {
-              type: { type: 'string' },
-              duration_minutes: { type: 'integer' },
-              notes: { type: 'string' },
+              type: {type: "string"},
+              duration_minutes: {type: "integer"},
+              notes: {type: "string"},
             },
-            required: ['type', 'duration_minutes', 'notes'],
+            required: ["type", "duration_minutes", "notes"],
           },
           meals: {
-            type: 'array',
+            type: "array",
             items: {
-              type: 'object',
+              type: "object",
               properties: {
-                time: { type: 'string' },
-                meal: { type: 'string' },
-                ingredients: { type: 'array', items: { type: 'string' } },
+                time: {type: "string"},
+                meal: {type: "string"},
+                ingredients: {type: "array", items: {type: "string"}},
               },
-              required: ['time', 'meal', 'ingredients'],
+              required: ["time", "meal", "ingredients"],
             },
           },
         },
-        required: ['fasting_window', 'hydration_goal_oz', 'steps_target', 'workout', 'meals'],
+        required: ["fasting_window", "hydration_goal_oz", "steps_target", "workout", "meals"],
       },
       nudges: {
-        type: 'array',
+        type: "array",
         items: {
-          type: 'object',
+          type: "object",
           properties: {
-            time_local: { type: 'string' },
-            message: { type: 'string' },
-            tone: { type: 'string', enum: ['coach', 'drill', 'friend'] },
+            time_local: {type: "string"},
+            message: {type: "string"},
+            tone: {type: "string", enum: ["coach", "drill", "friend"]},
           },
-          required: ['time_local', 'message', 'tone'],
+          required: ["time_local", "message", "tone"],
         },
       },
     },
-    required: ['today_plan', 'nudges'],
+    required: ["today_plan", "nudges"],
   };
 
   const resp = await ai.models.generateContent({
-    model: 'gemini-2.5-pro',
-    contents: [{ role: 'user', parts: [{ text: JSON.stringify(prompt) }] }],
+    model: "gemini-2.5-pro",
+    contents: [{role: "user", parts: [{text: JSON.stringify(prompt)}]}],
     config: {
       systemInstruction,
-      responseMimeType: 'application/json',
+      responseMimeType: "application/json",
       responseSchema: schema,
     },
   });
@@ -174,27 +184,27 @@ exports.generateDailyPlan = functions.https.onCall(async (data, context) => {
   try {
     json = JSON.parse(resp.text);
   } catch (e) {
-    throw new functions.https.HttpsError('internal', 'AI returned invalid JSON.');
+    throw new functions.https.HttpsError("internal", "AI returned invalid JSON.");
   }
 
   const planRef = admin.firestore().doc(`users/${uid}/dailyPlans/${date}`);
   await planRef.set(
-    {
-      date,
-      todayPlan: json.today_plan,
-      nudges: json.nudges,
-      generatedBy: 'gemini',
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    },
-    { merge: true }
+      {
+        date,
+        todayPlan: json.today_plan,
+        nudges: json.nudges,
+        generatedBy: "gemini",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      {merge: true},
   );
 
   await userRef.set(
-    { lastActiveAt: admin.firestore.FieldValue.serverTimestamp() },
-    { merge: true }
+      {lastActiveAt: admin.firestore.FieldValue.serverTimestamp()},
+      {merge: true},
   );
 
-  return { ok: true, date, dailyPlanPath: planRef.path, result: json };
+  return {ok: true, date, dailyPlanPath: planRef.path, result: json};
 });
 
 /**
@@ -204,8 +214,8 @@ exports.logWorkout = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   const workout = data?.workout;
 
-  if (!workout || typeof workout !== 'object') {
-    throw new functions.https.HttpsError('invalid-argument', 'Missing workout object.');
+  if (!workout || typeof workout !== "object") {
+    throw new functions.https.HttpsError("invalid-argument", "Missing workout object.");
   }
 
   const workoutRef = admin.firestore().collection(`users/${uid}/workouts`).doc();
@@ -215,11 +225,11 @@ exports.logWorkout = functions.https.onCall(async (data, context) => {
   });
 
   await admin.firestore().doc(`users/${uid}`).set(
-    { lastActiveAt: admin.firestore.FieldValue.serverTimestamp() },
-    { merge: true }
+      {lastActiveAt: admin.firestore.FieldValue.serverTimestamp()},
+      {merge: true},
   );
 
-  return { ok: true, workoutId: workoutRef.id };
+  return {ok: true, workoutId: workoutRef.id};
 });
 
 /**
@@ -227,27 +237,27 @@ exports.logWorkout = functions.https.onCall(async (data, context) => {
  */
 exports.createPost = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
-  const text = String(data?.text || '').trim();
-  const visibility = data?.visibility || 'public';
+  const text = String(data?.text || "").trim();
+  const visibility = data?.visibility || "public";
 
   if (!text || text.length > 500) {
     throw new functions.https.HttpsError(
-      'invalid-argument',
-      'Post text required (max 500 chars).'
+        "invalid-argument",
+        "Post text required (max 500 chars).",
     );
   }
 
-  const postRef = admin.firestore().collection('posts').doc();
+  const postRef = admin.firestore().collection("posts").doc();
   await postRef.set({
     uid,
     text,
-    mediaUrl: data?.mediaUrl || '',
+    mediaUrl: data?.mediaUrl || "",
     metrics: data?.metrics || {},
     visibility,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  return { ok: true, postId: postRef.id };
+  return {ok: true, postId: postRef.id};
 });
 
 /**
@@ -255,18 +265,18 @@ exports.createPost = functions.https.onCall(async (data, context) => {
  */
 exports.onUserCreate = functions.auth.user().onCreate(async (user) => {
   const uid = user.uid;
-  const email = user.email || '';
-  const displayName = user.displayName || '';
+  const email = user.email || "";
+  const displayName = user.displayName || "";
 
   await admin.firestore().doc(`users/${uid}`).set({
     email,
     displayName,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    roles: ['user'],
+    roles: ["user"],
     stats: {
       goalsCompleted: 0,
-      currentStreak: 0
-    }
+      currentStreak: 0,
+    },
   });
   console.log(`Created user profile for ${uid}`);
 });
@@ -280,8 +290,8 @@ exports.onUserDelete = functions.auth.user().onDelete(async (user) => {
   console.log(`Deleted user data for ${uid}`);
 });
 
-const { sendPartnerInvite, respondToInvite } = require('./partners');
-const { createGoal, submitProof, verifyProof } = require('./goals');
+const {sendPartnerInvite, respondToInvite} = require("./partners");
+const {createGoal, submitProof, verifyProof} = require("./goals");
 
 module.exports = {
   generateDailyPlan: exports.generateDailyPlan,
@@ -295,5 +305,5 @@ module.exports = {
   // Goals
   createGoal,
   submitProof,
-  verifyProof
+  verifyProof,
 };
