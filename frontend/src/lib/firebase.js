@@ -8,11 +8,11 @@ import { getFunctions } from "firebase/functions";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-    // TODO: Replace with actual config from Firebase Console
-    apiKey: "API_KEY",
-    authDomain: "PROJECT_ID.firebaseapp.com",
-    projectId: "PROJECT_ID",
-    storageBucket: "PROJECT_ID.appspot.com",
+    // API Key is still required from the user
+    apiKey: "REPLACE_WITH_YOUR_API_KEY",
+    authDomain: "commit-plus-prod.firebaseapp.com",
+    projectId: "commit-plus-prod",
+    storageBucket: "commit-plus-prod.appspot.com",
     messagingSenderId: "SENDER_ID",
     appId: "APP_ID"
 };

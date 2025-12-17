@@ -10,10 +10,14 @@ export default function Login() {
     const handleLogin = async (e) => {
         e.preventDefault();
         try {
-            // await signInWithEmailAndPassword(auth, email, password);
-            console.log("Login clicked (Firebase not fully configured yet)");
+            await signInWithEmailAndPassword(auth, email, password);
         } catch (error) {
             console.error(error);
+            if (error.code === 'auth/invalid-api-key') {
+                alert("Configuration Error: Please update frontend/src/lib/firebase.js with your valid Firebase API Key.");
+            } else {
+                alert(error.message);
+            }
         }
     };
 
